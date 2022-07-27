@@ -17,6 +17,8 @@ object GameEngineConfig {
   val spaceFieldHeight = config.get<Int>("SPACEFIELD_HEIGHT")
   val asteroidProbability = config.get<Double>("ASTEROID_PROBABILITY")
   val coefficientRestitution = config.get<Double>("COEFFICIENT_RESTITUTION")
+  val explosionMinAmount = config.get<Int>("EXPLOSION_MIN_AMOUNT")
+  val explosionMaxAmount = config.get<Int>("EXPLOSION_MAX_AMOUNT")
 
   val msPerFrame: Int = MILLISECONDS_PER_SECOND / this.frameRate
 }
@@ -82,6 +84,12 @@ class GameEngine(
     this.moveSpaceObjects()
     this.trimSpaceObjects()
     this.generateAsteroids()
+    this.explosionFrameStep()
+  }
+
+  // filters out all explosions that are at the end of their lifespan
+  private fun explosionFrameStep() {
+    this.field.explosions.filter { it.stillAliveAfterFrame() }
   }
 
   fun handleCollisions() {
@@ -89,6 +97,15 @@ class GameEngine(
         (first, second) ->
       if (first.impacts(second)) {
         first.collideWith(second, GameEngineConfig.coefficientRestitution)
+        if (first.type == "Missile" && second.type == "Asteroid") {
+          val numExp = this.generator.generateIntegerInRange(
+            GameEngineConfig.explosionMinAmount,
+            GameEngineConfig.explosionMaxAmount
+          )
+          repeat(numExp) {
+            this.field.generateExplosion(second.center)
+          }
+        }
       }
     }
   }
@@ -97,11 +114,13 @@ class GameEngine(
     this.field.moveShip()
     this.field.moveAsteroids()
     this.field.moveMissiles()
+    this.field.moveExplosions()
   }
 
   fun trimSpaceObjects() {
     this.field.trimAsteroids()
     this.field.trimMissiles()
+    this.field.trimExplosions()
   }
 
   fun generateAsteroids() {

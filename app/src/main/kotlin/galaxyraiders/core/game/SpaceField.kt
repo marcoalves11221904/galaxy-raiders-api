@@ -23,6 +23,10 @@ object SpaceFieldConfig {
   val asteroidMinMass = config.get<Int>("ASTEROID_MIN_MASS")
   val asteroidMaxMass = config.get<Int>("ASTEROID_MAX_MASS")
   val asteroidMassMultiplier = config.get<Double>("ASTEROID_MASS_MULTIPLIER")
+
+  val explosionSpeedLimit = config.get<Double>("EXPLOSION_SPEED_LIMIT")
+  val explosionMinRadius = config.get<Double>("EXPLOSION_MIN_RADIUS")
+  val explosionMaxRadius = config.get<Double>("EXPLOSION_MAX_RADIUS")
 }
 
 @Suppress("TooManyFunctions")
@@ -38,8 +42,10 @@ data class SpaceField(val width: Int, val height: Int, val generator: RandomGene
   var asteroids: List<Asteroid> = emptyList()
     private set
 
+  var explosions: List<Explosion> = emptyList()
+
   val spaceObjects: List<SpaceObject>
-    get() = listOf(this.ship) + this.missiles + this.asteroids
+    get() = listOf(this.ship) + this.missiles + this.asteroids + this.explosions
 
   fun moveShip() {
     this.ship.move(boundaryX, boundaryY)
@@ -53,12 +59,20 @@ data class SpaceField(val width: Int, val height: Int, val generator: RandomGene
     this.asteroids.forEach { it.move() }
   }
 
+  fun moveExplosions() {
+    this.explosions.forEach { it.move() }
+  }
+
   fun generateMissile() {
     this.missiles += this.createMissile()
   }
 
   fun generateAsteroid() {
     this.asteroids += this.createAsteroidWithRandomProperties()
+  }
+
+  fun generateExplosion(pos: Point2D) {
+    this.explosions += this.createExplosion(pos)
   }
 
   fun trimMissiles() {
@@ -69,6 +83,12 @@ data class SpaceField(val width: Int, val height: Int, val generator: RandomGene
 
   fun trimAsteroids() {
     this.asteroids = this.asteroids.filter {
+      it.inBoundaries(this.boundaryX, this.boundaryY)
+    }
+  }
+
+  fun trimExplosions() {
+    this.explosions = this.explosions.filter {
       it.inBoundaries(this.boundaryX, this.boundaryY)
     }
   }
@@ -97,6 +117,28 @@ data class SpaceField(val width: Int, val height: Int, val generator: RandomGene
       radius = SpaceFieldConfig.missileRadius,
       mass = SpaceFieldConfig.missileMass,
     )
+  }
+
+  private fun createExplosion(pos: Point2D): Explosion {
+    return Explosion(
+      initialPosition = pos,
+      initialVelocity = generateRandomExplosionVel(),
+      radius = generateRandomExplosionRadius(),
+      mass = 0.0,
+    )
+  }
+
+  private fun generateRandomExplosionVel(): Vector2D {
+    val speedLim = SpaceFieldConfig.explosionSpeedLimit
+    val expX = this.generator.generateDoubleInInterval(min = -speedLim, max = speedLim)
+    val expY = this.generator.generateDoubleInInterval(min = -speedLim, max = speedLim)
+    return(Vector2D(dx = expX, dy = expY))
+  }
+
+  private fun generateRandomExplosionRadius(): Double {
+    val minR = SpaceFieldConfig.explosionMinRadius
+    val maxR = SpaceFieldConfig.explosionMaxRadius
+    return(this.generator.generateDoubleInInterval(min = minR, max = maxR))
   }
 
   private fun defineMissilePosition(missileRadius: Double): Point2D {
